@@ -377,7 +377,7 @@ static struct mipi_dsi_platform_data mipi_pdata = {
 #define BRI_SETTING_MAX                 255
 
 #define PWM_MIN                   6       /* 3.5% of max pwm */
-#define PWM_DEFAULT               96     /* 43% of max pwm  */
+#define PWM_DEFAULT               91     /* 43% of max pwm  */
 #define PWM_MAX                   255
 
 static unsigned char rider_shrink_pwm(int val)
