@@ -623,7 +623,6 @@ static void __rpc_execute(struct rpc_task *task)
 	BUG_ON(RPC_IS_QUEUED(task));
 
 	for (;;) {
-
 		/*
 		 * Execute any pending callback.
 		 */
