@@ -128,6 +128,13 @@ config CPU_FREQ_DEFAULT_GOV_SMARTASS2
 	help
 	  Use the CPUFreq governor 'smartassV2' as default.
 
+config CPU_FREQ_DEFAULT_GOV_INTELLIDEMAND
+	bool "intellidemand"
+	select CPU_FREQ_GOV_INTELLIDEMAND
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Intelligent OnDemand Govneror based on Samsung Patched OnDemand
+
 config CPU_FREQ_DEFAULT_GOV_LAGFREE
 	bool "lagfree"
 	select CPU_FREQ_GOV_LAGFREE
@@ -224,19 +231,27 @@ config CPU_FREQ_GOV_CONSERVATIVE
 
 	  If in doubt, say N.
 
-config CPU_FREQ_MIN_TICKS
-	int "Ticks between governor polling interval."
-	default 10
-	help
-	  Minimum number of ticks between polling interval for governors.
-
-	  If in doubt, say N.
-
 config CPU_FREQ_GOV_SMARTASS2
 	tristate "'smartassV2' cpufreq governor"
 	depends on CPU_FREQ
 	help
 	  'smartassV2' - a "smart" optimized governor for the hero!
+
+config SEC_LIMIT_MAX_FREQ
+	bool "Limit Max Freq"
+	help
+	  Limit Max Freq
+
+config DETECT_BROWSER_STATE
+	bool "detect browser state"
+	help
+	  detect browser state by looking at 3D busy bit
+
+config CPU_FREQ_GOV_INTELLIDEMAND
+	tristate "'intellidemand' cpufreq governor"
+	depends on CPU_FREQ
+	help
+	  'intellidemand' - an intelligent ondemand governor
 
 config CPU_FREQ_GOV_LAGFREE
 	tristate "'lagfree' cpufreq governor"
@@ -255,19 +270,19 @@ config CPU_FREQ_GOV_LAGFREE
 
 	  If in doubt, say N.
 
+config CPU_FREQ_MIN_TICKS
+	int "Ticks between governor polling interval."
+	default 10
+	help
+	  Minimum number of ticks between polling interval for governors.
+
+	  If in doubt, say N.
+
 config CPU_FREQ_SAMPLING_LATENCY_MULTIPLIER
 	int "Sampling rate multiplier for governors."
 	default 1000
 	help
 	  Sampling latency rate multiplied by the cpu switch latency.
 	  Affects governor polling.
-
-config VDD_USERSPACE
-	bool "VDD sysfs interface"
-	default n
-	depends on CPU_FREQ_STAT
-	help
-	  exposes the VDD table to userspace
-	  allows users to adjust voltages on the fly
 
 endif	# CPU_FREQ

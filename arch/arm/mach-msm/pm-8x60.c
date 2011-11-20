@@ -34,6 +34,7 @@
 #include <linux/mfd/pmic8058.h>
 #include <linux/seq_file.h>
 #include <linux/console.h>
+#include <linux/cpufreq.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
 #include <mach/gpio.h>
@@ -222,7 +223,7 @@ static int __init msm_pm_mode_sysfs_add_cpu(
 {
 	char cpu_name[8];
 	struct kobject *cpu_kobj;
-	struct msm_pm_sysfs_sleep_mode *mode;
+	struct msm_pm_sysfs_sleep_mode *mode = NULL;
 	int i, k;
 	int ret;
 
@@ -279,6 +280,11 @@ static int __init msm_pm_mode_sysfs_add_cpu(
 	ret = 0;
 
 mode_sysfs_add_cpu_exit:
+	if (!ret) {
+		if (mode && mode->kobj)
+			kobject_del(mode->kobj);
+		kfree(mode);
+	}
 	return ret;
 }
 
@@ -612,7 +618,6 @@ EXPORT_SYMBOL(msm_pm_set_max_sleep_time);
 struct msm_pm_device {
 	unsigned int cpu;
 #ifdef CONFIG_HOTPLUG_CPU
-	unsigned long saved_acpu_rate;
 	struct completion cpu_killed;
 	unsigned int warm_boot;
 #endif
@@ -778,7 +783,12 @@ static void msm_pm_power_collapse(bool from_idle)
 
 	avsdscr_setting = avs_get_avsdscr();
 	avs_disable();
-	saved_acpuclk_rate = acpuclk_power_collapse();
+
+	if (cpu_online(dev->cpu))
+		saved_acpuclk_rate = acpuclk_power_collapse();
+	else
+		saved_acpuclk_rate = 0;
+
 	if ((!from_idle) && (MSM_PM_DEBUG_CLOCK & msm_pm_debug_mask))
 		pr_info("CPU%u: %s: change clock rate (old rate = %lu)\n",
 			dev->cpu, __func__, saved_acpuclk_rate);
@@ -826,6 +836,7 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev)
 	uint32_t latency_us;
 	uint32_t sleep_us;
 	int i;
+	struct cpufreq_policy *policy = NULL;
 
 	latency_us = (uint32_t) pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 	sleep_us = (uint32_t) ktime_to_ns(tick_nohz_get_sleep_length());
@@ -858,6 +869,16 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev)
 			if (has_wake_lock(WAKE_LOCK_IDLE)) {
 				allow = false;
 				break;
+			}
+
+			policy = cpufreq_cpu_get(dev->cpu);
+			if (policy) {
+				if (policy->cur > policy->min) {
+					allow = false;
+					cpufreq_cpu_put(policy);
+					break;
+				}
+				cpufreq_cpu_put(policy);
 			}
 
 			if (!dev->cpu &&
@@ -1207,12 +1228,8 @@ void platform_cpu_die(unsigned int cpu)
 	flush_cache_all();
 
 	for (;;) {
-		if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE]) {
-			struct msm_pm_device *dev =
-				&__get_cpu_var(msm_pm_devices);
-			dev->saved_acpu_rate = acpuclk_get_rate(cpu);
+		if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE])
 			msm_pm_power_collapse(false);
-		}
 		else if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE])
 			msm_pm_power_collapse_standalone(false);
 		else if (allow[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT])
@@ -1241,15 +1258,6 @@ int msm_pm_platform_secondary_init(unsigned int cpu)
 	vfp_reinit();
 #endif
 
-	if (dev->saved_acpu_rate) {
-		ret = acpuclk_set_rate(dev->cpu,
-				dev->saved_acpu_rate,
-				SETRATE_PC);
-		if (ret)
-			pr_err("CPU%u: %s: failed clock rate restore(%lu)\n",
-			dev->cpu, __func__, dev->saved_acpu_rate);
-		dev->saved_acpu_rate = 0;
-	}
 	ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING, false);
 
 	return ret;

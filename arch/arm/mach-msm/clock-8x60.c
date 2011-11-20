@@ -137,6 +137,7 @@
 #define JPEGD_CC_REG				REG_MM(0x00A4)
 #define JPEGD_NS_REG				REG_MM(0x00AC)
 #define MAXI_EN_REG				REG_MM(0x0018)
+#define MAXI_EN2_REG			REG_MM(0x0020)
 #define MAXI_EN3_REG				REG_MM(0x002C)
 #define MDP_CC_REG				REG_MM(0x00C0)
 #define MDP_MD0_REG				REG_MM(0x00C4)
@@ -638,6 +639,7 @@ static struct clk_freq_tbl clk_tbl_adm[] = {
 	}
 static struct clk_freq_tbl clk_tbl_gsbi_uart[] = {
 	F_GSBI_UART(       0, BB_GND,  1,  0,   0, NONE),
+	F_GSBI_UART( 1843200, BB_PLL8, 1,  3, 625, LOW),
 	F_GSBI_UART( 3686400, BB_PLL8, 1,  6, 625, LOW),
 	F_GSBI_UART( 7372800, BB_PLL8, 1, 12, 625, LOW),
 	F_GSBI_UART(14745600, BB_PLL8, 1, 24, 625, LOW),
@@ -1436,7 +1438,7 @@ static struct bank_masks bdiv_info_rot = {
 		.ns_mask =	BM(29, 26) | BM(21, 19),
 	},
 };
-#define CLK_ROT(id) \
+#define CLK_ROT(id, par) \
 	[L_##id##_CLK] = { \
 		.type = BASIC, \
 		.ns_reg = ROT_NS_REG, \
@@ -1451,7 +1453,7 @@ static struct bank_masks bdiv_info_rot = {
 		.set_rate = set_rate_div_banked, \
 		.freq_tbl = clk_tbl_rot, \
 		.bank_masks = &bdiv_info_rot, \
-		.parent = L_NONE_CLK, \
+		.parent = L_##par##_CLK, \
 		.test_vector = TEST_MM_HS(0x1B), \
 		.current_freq = &local_dummy_freq, \
 	}
@@ -1572,7 +1574,7 @@ static struct clk_freq_tbl clk_tbl_vcodec[] = {
 };
 
 /* VPE */
-#define CLK_VPE(id) \
+#define CLK_VPE(id, par) \
 	[L_##id##_CLK] = { \
 		.type = BASIC, \
 		.ns_reg = VPE_NS_REG, \
@@ -1587,7 +1589,7 @@ static struct clk_freq_tbl clk_tbl_vcodec[] = {
 		.ns_mask = (BM(15, 12) | BM(2, 0)), \
 		.set_rate = set_rate_nop, \
 		.freq_tbl = clk_tbl_vpe, \
-		.parent = L_NONE_CLK, \
+		.parent = L_##par##_CLK, \
 		.test_vector = TEST_MM_HS(0x1C), \
 		.current_freq = &local_dummy_freq, \
 	}
@@ -2015,7 +2017,7 @@ struct clk_local soc_clk_local_tbl[] = {
 	CLK_SLAVE(PIXEL_LCDC, PIXEL_CC_REG, BIT(8), NULL, 0,
 		DBG_BUS_VEC_C_REG, HALT, 21, PIXEL_MDP, TEST_MM_LS(0x01)),
 
-	CLK_ROT(ROT),
+	CLK_ROT(ROT, ROT_AXI),
 
 	CLK_TV(TV_SRC),
 	CLK_SLAVE(TV_ENC,  TV_CC_REG,  BIT(8), SW_RESET_CORE_REG, BIT(0),
@@ -2032,7 +2034,7 @@ struct clk_local soc_clk_local_tbl[] = {
 
 	CLK_VCODEC(VCODEC, VCODEC_AXI),
 
-	CLK_VPE(VPE),
+	CLK_VPE(VPE, VPE_AXI),
 
 	CLK_VFE(VFE, VFE_AXI),
 	CLK_SLAVE(CSI0_VFE, VFE_CC_REG, BIT(12), SW_RESET_CORE_REG, BIT(24),
@@ -2054,8 +2056,10 @@ struct clk_local soc_clk_local_tbl[] = {
 	CLK_NORATE(VFE_AXI,   MAXI_EN_REG, BIT(18), SW_RESET_AXI_REG, BIT(9),
 		DBG_BUS_VEC_E_REG, HALT, 0, TEST_MM_HS(0x18)),
 	CLK_RESET(MDP_AXI,    SW_RESET_AXI_REG, BIT(13)),
-	CLK_RESET(ROT_AXI,    SW_RESET_AXI_REG, BIT(6)),
-	CLK_RESET(VPE_AXI,    SW_RESET_AXI_REG, BIT(15)),
+	CLK_NORATE(ROT_AXI, MAXI_EN2_REG, BIT(24), SW_RESET_AXI_REG, BIT(6),
+	DBG_BUS_VEC_E_REG, HALT, 2, TEST_MM_HS(0x16)),
+	CLK_NORATE(VPE_AXI, MAXI_EN2_REG, BIT(26), SW_RESET_AXI_REG, BIT(15),
+	DBG_BUS_VEC_E_REG, HALT, 1, TEST_MM_HS(0x19)),
 
 	/* AHB Interfaces */
 	CLK_NORATE(AMP_P,    AHB_EN_REG, BIT(24), NULL, 0,
@@ -2475,15 +2479,11 @@ static void reg_init(void)
 	writel(0, MM_PLL2_MODE_REG); /* PXO */
 	writel(0x00800000, MM_PLL2_CONFIG_REG); /* Enable main out. */
 
-	/* TODO:
-	 * The ADM clock votes below should removed once all users of the ADMs
-	 * begin voting for the clocks appropriately.
-	 */
 	 /* The clock driver doesn't use SC1's voting register to control
 	 * HW-voteable clocks.  Clear its bits so that disabling bits in the
 	 * SC0 register will cause the corresponding clocks to be disabled. */
 	rmwreg(BIT(12)|BIT(11), SC0_U_CLK_BRANCH_ENA_VOTE_REG, BM(12, 11));
-	writel(BIT(12)|BIT(11)|BM(5, 2), SC1_U_CLK_BRANCH_ENA_VOTE_REG);
+	writel_relaxed(BIT(12)|BIT(11), SC1_U_CLK_BRANCH_ENA_VOTE_REG);
 	/* Let sc_aclk and sc_clk halt when both Scorpions are collapsed. */
 	writel(BIT(12)|BIT(11), SC0_U_CLK_SLEEP_ENA_VOTE_REG);
 	writel(BIT(12)|BIT(11), SC1_U_CLK_SLEEP_ENA_VOTE_REG);
@@ -2495,8 +2495,8 @@ static void reg_init(void)
 	 * gating for all clocks. Also set VFE_AHB's FORCE_CORE_ON bit to
 	 * prevent its memory from being collapsed when the clock is halted.
 	 * The sleep and wake-up delays are set to safe values. */
-	rmwreg(0x00000003, AHB_EN_REG,  0x6C000003);
-	writel(0x000007F9, AHB_EN2_REG);
+	rmwreg(0x00000003, AHB_EN_REG,  0x0F7FFFFF);
+	rmwreg(0x000007F9, AHB_EN2_REG, 0x7FFFBFFF);
 
 	/* Deassert all locally-owned MM AHB resets. */
 	rmwreg(0, SW_RESET_AHB_REG, 0xFFF7DFFF);
@@ -2504,31 +2504,36 @@ static void reg_init(void)
 	/* Initialize MM AXI registers: Enable HW gating for all clocks that
 	 * support it. Also set FORCE_CORE_ON bits, and any sleep and wake-up
 	 * delays to safe values. */
-	rmwreg(0x100207F9, MAXI_EN_REG,  0x1803FFFF);
-	/* MAXI_EN2_REG is owned by the RPM.  Don't touch it. */
+	rmwreg(0x000307F9, MAXI_EN_REG,  0x0FFFFFFF);
+	rmwreg(0x7027FCFF, MAXI_EN2_REG, 0x7A3FFFFF);
 	writel(0x3FE7FCFF, MAXI_EN3_REG);
 	writel(0x000001D8, SAXI_EN_REG);
 
 	/* Initialize MM CC registers: Set MM FORCE_CORE_ON bits so that core
 	 * memories retain state even when not clocked. Also, set sleep and
 	 * wake-up delays to safe values. */
-	rmwreg(0x00000000, CSI_CC_REG,    0x00000018);
-	rmwreg(0x00000400, MISC_CC_REG,   0x017C0400);
-	rmwreg(0x000007FD, MISC_CC2_REG,  0x70C2E7FF);
-	rmwreg(0x80FF0000, GFX2D0_CC_REG, 0xE0FF0010);
-	rmwreg(0x80FF0000, GFX2D1_CC_REG, 0xE0FF0010);
-	rmwreg(0x80FF0000, GFX3D_CC_REG,  0xE0FF0010);
-	rmwreg(0x80FF0000, IJPEG_CC_REG,  0xE0FF0018);
-	rmwreg(0x80FF0000, JPEGD_CC_REG,  0xE0FF0018);
-	rmwreg(0x80FF0000, MDP_CC_REG,    0xE1FF0010);
-	rmwreg(0x80FF0000, PIXEL_CC_REG,  0xE1FF0010);
-	rmwreg(0x000004FF, PIXEL_CC2_REG, 0x000007FF);
-	rmwreg(0x80FF0000, ROT_CC_REG,    0xE0FF0010);
-	rmwreg(0x80FF0000, TV_CC_REG,     0xE1FFC010);
-	rmwreg(0x000004FF, TV_CC2_REG,    0x000027FF);
-	rmwreg(0xC0FF0000, VCODEC_CC_REG, 0xE0FF0010);
-	rmwreg(0x80FF0000, VFE_CC_REG,    0xE0FFC010);
-	rmwreg(0x80FF0000, VPE_CC_REG,    0xE0FF0010);
+	writel(0x00000000, CSI_CC_REG);
+	rmwreg(0x00000000, MISC_CC_REG,  0xFEFFF3FF);
+	rmwreg(0x000007FD, MISC_CC2_REG, 0xFFFF7FFF);
+	writel(0x80FF0000, GFX2D0_CC_REG);
+	writel(0x80FF0000, GFX2D1_CC_REG);
+	writel(0x80FF0000, GFX3D_CC_REG);
+	writel(0x80FF0000, IJPEG_CC_REG);
+	writel(0x80FF0000, JPEGD_CC_REG);
+	/* MDP and PIXEL clocks may be running at boot, don't turn them off. */
+	rmwreg(0x80FF0000, MDP_CC_REG,   BM(31, 29) | BM(23, 16));
+#ifdef CONFIG_FB_MSM_LCDC_AUO_WXGA
+	rmwreg(0x80FF0200, PIXEL_CC_REG, BM(31, 29) | BM(23, 16));
+#else
+	rmwreg(0x80FF0000, PIXEL_CC_REG, BM(31, 29) | BM(23, 16));
+#endif
+	writel(0x000004FF, PIXEL_CC2_REG);
+	writel(0x80FF0000, ROT_CC_REG);
+	writel(0x80FF0000, TV_CC_REG);
+	writel(0x000004FF, TV_CC2_REG);
+	writel(0xC0FF0000, VCODEC_CC_REG);
+	writel(0x80FF0000, VFE_CC_REG);
+	writel(0x80FF0000, VPE_CC_REG);
 
 	/* De-assert MM AXI resets to all hardware blocks. */
 	writel(0, SW_RESET_AXI_REG);
@@ -2584,6 +2589,7 @@ void __init msm_clk_soc_init(void)
 	local_clk_set_rate(C(USB_HS1_XCVR), 60000000);
 	local_clk_set_rate(C(USB_FS1_SRC), 60000000);
 	local_clk_set_rate(C(USB_FS2_SRC), 60000000);
+
 }
 
 void msm_clk_soc_set_ignore_list(int *ignore_clk, unsigned num_ignore_clk)
