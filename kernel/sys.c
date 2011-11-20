@@ -394,6 +394,9 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 	mutex_lock(&reboot_mutex);
 	switch (cmd) {
 	case LINUX_REBOOT_CMD_RESTART:
+		printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_RESTART).\n");
+		emergency_sync();
+		emergency_remount();
 		kernel_restart(NULL);
 		break;
 
@@ -406,11 +409,17 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 		break;
 
 	case LINUX_REBOOT_CMD_HALT:
+		printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_HALT).\n");
+		emergency_sync();
+		emergency_remount();
 		kernel_halt();
 		do_exit(0);
 		panic("cannot halt");
 
 	case LINUX_REBOOT_CMD_POWER_OFF:
+		printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_POWER_OFF).\n");
+		emergency_sync();
+		emergency_remount();
 		kernel_power_off();
 		do_exit(0);
 		break;
@@ -421,6 +430,12 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 			break;
 		}
 		buffer[sizeof(buffer) - 1] = '\0';
+
+		if (strncmp(buffer, "oem-00", 6)) {
+			printk(KERN_EMERG "emergency_remount (LINUX_REBOOT_CMD_RESTART2).\n");
+			emergency_sync();
+			emergency_remount();
+		}
 
 		kernel_restart(buffer);
 		break;
@@ -1082,8 +1097,10 @@ SYSCALL_DEFINE0(setsid)
 	err = session;
 out:
 	write_unlock_irq(&tasklist_lock);
-	if (err > 0)
+	if (err > 0) {
 		proc_sid_connector(group_leader);
+		sched_autogroup_create_attach(group_leader);
+	}
 	return err;
 }
 
