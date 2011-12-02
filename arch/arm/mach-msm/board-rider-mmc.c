@@ -323,7 +323,7 @@ EXPORT_SYMBOL(mmc_wimax_set_carddetect);
 static unsigned int mmc_wimax_type = MMC_TYPE_SDIO_WIMAX;
 
 static struct mmc_platform_data mmc_wimax_data = {
-	.ocr_mask		= MMC_VDD_27_28 | MMC_VDD_28_29 | MMC_VDD_29_30,
+	.ocr_mask		= MMC_VDD_21_22 | MMC_VDD_22_23 | MMC_VDD_23_24,
 	.status			= mmc_wimax_status,
 	.register_status_notify	= mmc_wimax_status_register,
 	.embedded_sdio		= NULL,
