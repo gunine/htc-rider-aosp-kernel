@@ -217,14 +217,14 @@ static int htc_headset_gpio_probe(struct platform_device *pdev)
 	hi->key_irq_type = IRQF_TRIGGER_LOW;
 	hi->headset_state = 0;
 
-	detect_wq = create_workqueue("HS_GPIO_DETECT");
+	detect_wq = create_singlethread_workqueue("HS_GPIO_DETECT");
 	if (detect_wq == NULL) {
 		ret = -ENOMEM;
 		HS_ERR("Failed to create detect workqueue");
 		goto err_create_detect_work_queue;
 	}
 
-	button_wq = create_workqueue("HS_GPIO_BUTTON");
+	button_wq = create_singlethread_workqueue("HS_GPIO_BUTTON");
 	if (button_wq == NULL) {
 		ret = -ENOMEM;
 		HS_ERR("Failed to create button workqueue");

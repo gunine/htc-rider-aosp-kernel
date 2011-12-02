@@ -3148,7 +3148,7 @@ int __init tty_init(void)
 	device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 1), NULL,
 			      "console");
 #if defined(CONFIG_MSM_SMD0_WQ)
-	tty_wq = create_workqueue("tty_smd0");
+	tty_wq = create_singlethread_workqueue("tty_smd0");
 	printk(KERN_DEBUG "[TTY_IO] create tty_wq for smd0\n");
 #endif
 
