@@ -190,10 +190,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 SUBARCH := arm
 export KBUILD_BUILDHOST := $(SUBARCH)
 ARCH		?= $(SUBARCH)
-#CROSS_COMPILE	?= arm-eabi-
-#CROSS_COMPILE ?= /home/guni/android_kernel/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
-#CROSS_COMPILE ?= /home/guni/CodeSourcery/Sourcery_G++_Lite/bin/arm-none-eabi-
-CROSS_COMPILE ?= /home/guni/android_dev/arm-201009/bin/arm-none-linux-gnueabi-
+CROSS_COMPILE	?= arm-eabi-
 CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 
 # Architecture as present in compile.h
