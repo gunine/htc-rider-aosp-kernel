@@ -165,6 +165,10 @@
 extern void sii9234_change_usb_owner(bool bMHL);
 #endif //CONFIG_FB_MSM_HDMI_MHL
 
+#ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
+int set_two_phase_freq(int cpufreq);
+int intelli_set_two_phase_freq(int cpufreq);
+#endif
 
 unsigned engineerid, mem_size_mb;
 
@@ -5260,6 +5264,11 @@ static void __init rider_init(void)
 
 #ifdef CONFIG_PERFLOCK
 	perflock_init(&holiday_perflock_data);
+#endif
+
+#ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
+	set_two_phase_freq(1134000);
+	intelli_set_two_phase_freq(1026000);
 #endif
 
 	msm8x60_init_tlmm();
