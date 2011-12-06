@@ -120,6 +120,7 @@
 #include "sysinfo-8x60.h"
 #include "clock-8x60.h"
 
+#include <mach/restart.h>
 #include <mach/htc_usb.h>
 #include <mach/rpc_hsusb.h>
 #include <mach/cable_detect.h>
@@ -5205,6 +5206,8 @@ static void __init rider_init(void)
 	int rc = 0;
 	struct kobject *properties_kobj;
 	msm_mpm_defer_ignore_list = 1;
+
+	pmic_reset_irq = PM8058_RESOUT_IRQ(PM8058_IRQ_BASE);
 
 	/*
 	 * Initialize RPM first as other drivers and devices may need
